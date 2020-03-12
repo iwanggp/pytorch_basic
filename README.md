@@ -79,3 +79,22 @@ def generate_txt(txt_path, data_path):
 
 通过遍历图片的路径，然后将图片的地址和标签提取出来写入到文件中。我们这里分别制作了**train.txt,valid.txt,test.txt**这三个数据文件。
 #### 2.2 继承**DataSet**类
+我们将图片划分为训练集、验证集合测试集，接下来就是让PyTorch能读取这批数据。这里就需要按照PyTorch读取图片的机制和流程来进行代码的编写了。
+##### Dataset类
+要能让PyTorch读取我们的图片，主要是通过**Dataset**类,Dataset类作为所有的datasets的基类存在，所有的datasets都要继承它，这一点类似于C++中的虚基类。我们可以看下源码实现细节：
+
+```python
+class Dataset(object):
+"""An abstract class representing a Dataset.
+All other datasets should subclass it. All subclasses should override ``__len__``, 
+that provides the size of the dataset, and ``__getitem__``, 
+supporting integer indexing in range from 0 to len(self) exclusive.
+"""
+	def __getitem__(self, index): 
+		raise NotImplementedError
+	def __len__(self):
+		raise NotImplementedError
+	def __add__(self, other):
+		return ConcatDataset([self, other])
+```
+从上面的源码可以看出，Dataset的子类必须实现```__getitem__```和```__len__```，否则程序将报错！这里重点看**getitem**函数，它接受一个index即单个图片的索引，然后返回图片数据和标签，这个index通常指的是一个list的index，这个list的每个元素就包含了图片数据的路径和标签信息。**__len__**就不用多说了，就是数据集中样本的总数。
