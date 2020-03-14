@@ -98,3 +98,67 @@ supporting integer indexing in range from 0 to len(self) exclusive.
 		return ConcatDataset([self, other])
 ```
 从上面的源码可以看出，Dataset的子类必须实现```__getitem__```和```__len__```，否则程序将报错！这里重点看**getitem**函数，它接受一个index即单个图片的索引，然后返回图片数据和标签，这个index通常指的是一个list的index，这个list的每个元素就包含了图片数据的路径和标签信息。**__len__**就不用多说了，就是数据集中样本的总数。
+
+这里需要重点看的是getitem函数，getitem接受一个index，然后返回图片数据和标签，这个index通常指的是一个list的index，那么这个list的每个元素就包含了图片数据的路径和标签信息。归纳一下就是如下的3个基本流程：
+
+>**1.制作存储了图片的路径和标签信息的txt**
+
+>**2.将这些信息转化成list，该list每一个元素对应一个样本**
+
+>**3.通过getitem函数，读取数据和标签，并返回数据和标签**
+
+实际操作中，我们只要通过DataLoader就可以获取一个batch的数据，其实触发去读取图片操作的是Dataloader里的__iter__(self)，因此这里如果让PyTorch读取自己的数据集，这里归纳一下需要两步：
+
+> **1. 制作图片数据的索引**
+
+> **2.构建Dataset的子类**
+
+##### 制作图片数据的索引
+
+这个非常的简单，就是读取图片路径，标签，保存到txt文件中。只要按照一行一条条目就可以了，这里需要强调一点的是在这txt文本中的图片路径是和训练脚本指定的相对路径，如果训练脚本位置改变该条目路径也要相应的改变，所以我的习惯是放绝对路径。所以这一点要注意的！这一段代码可以参考```./utils/generate_txt.py```这个脚本文件。
+
+##### 继承Dataset父类
+
+这一步很关键，这一步就是建立起与**Dataloader**通信的关键一步，这里就像上文提到的关键是要重写它的**__getitem__**和**__len__**方法，具体代码如下：
+
+```python
+
+"""
+构建自己的数据集类，需要实现Datasets这个类。需要关键实现__getitem__和__len__方法
+1.制作图片数据的索引
+2.构建Dataset子类
+"""
+from PIL import Image
+from torch.utils.data import Dataset
+
+
+class MyDatasets(Dataset):
+    def __init__(self, txt_path, transform=None, target_transform=None):
+        imgs = []#定义图片数据的list
+        with open(txt_path, 'r') as f:
+            fh = f.readlines()
+            for line in fh:
+                line = line.rstrip()
+                words = line.split()
+                imgs.append((words[0], int(words[1])))#img单个list添加图片路径和标签
+        self.imgs = imgs
+        self.transform = transform  # tansform图片变换
+        self.target_transform = target_transform
+
+    def __getitem__(self, index):
+        fn, label = self.imgs[index]
+        img = Image.open(fn).convert("RGB")  # 这里的图片是一个PIL对象
+        if self.transform is not None:
+            img = self.transform(img)
+        return img, label
+
+    def __len__(self):
+        return len(self.imgs)
+        
+```
+
+这段代码首先进行初始化，初始化中从准备好的txt里获取图片的路径和标签，并且存储在self.imgs，就是txt中的一行。个人习惯也将图片的预处理transform放在初始化中，transform是一个Compose类型，里边是一个list，list中会定义各种对图像进行处理的操作，该操作共有22个预处理操作，这里就不再赘述了。
+
+我们着重看看核心的**getitem**函数：
+
+首先我们从初始化中根据索引取出imgs的一个条目，这样就取出了一个包含图片路径和图片标签的条目。下面就要主要强调一点的是**DataLoader**中加载的是PIL对象，所以这里要将图片打开，就是通过```Image.open(fn).convert("RGB")```打开即可，下面就是对图像进行transform预处理了。这样我们自己的MyDataset就建立好了，下一步就是交给**DataLoader**进行加载了！
