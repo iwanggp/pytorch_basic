@@ -110,7 +110,6 @@ supporting integer indexing in range from 0 to len(self) exclusive.
 实际操作中，我们只要通过DataLoader就可以获取一个batch的数据，其实触发去读取图片操作的是Dataloader里的__iter__(self)，因此这里如果让PyTorch读取自己的数据集，这里归纳一下需要两步：
 
 > **1. 制作图片数据的索引**
-
 > **2.构建Dataset的子类**
 
 ##### 制作图片数据的索引
@@ -162,3 +161,26 @@ class MyDatasets(Dataset):
 我们着重看看核心的**getitem**函数：
 
 首先我们从初始化中根据索引取出imgs的一个条目，这样就取出了一个包含图片路径和图片标签的条目。下面就要主要强调一点的是**DataLoader**中加载的是PIL对象，所以这里要将图片打开，就是通过```Image.open(fn).convert("RGB")```打开即可，下面就是对图像进行transform预处理了。这样我们自己的MyDataset就建立好了，下一步就是交给**DataLoader**进行加载了！
+#### 2.3 进行数据预处理
+
+#### 2.4 使用**DataLoader**加载数据
+从上节中我们实现了构建自己的Dataset子类，并实现了两个重要的方法**getitem**和**len**方法，其实它实现的一个重要作用就是获取图片的索引以及定义如何通过索引读取图片及其标签。但是这只是第一步，这样数据并没有到模型中，要触发MyDataset去读取图片及其标签却是在数据加载器**DataLoader**中。
+一句话概括就是：**从MyDataset来，到MyDataset去**。在我们实现的MyDataset类中，在该实例中有路径，有读取图片的方法，然后需要PyTorch的一系列规范化流程，才会调用MyDataset中的**getitem**函数，最终通过**Image.open()**读取图片数据。然后对原始数据进行一系列预处理，将数据转换为Variable类型，最终成为模型的输入。
+
+**详细流程如下：**
+
+1.从MyDataset类中初始化txt，txt中有图片路径和标签
+
+2.初始化**DataLoader**时，将train_data传入，从而使**DataLoader**拥有图片的路径
+
+3.在一个iteration进行时，才读取一个batch的图片数据enumerate()函数会返回可迭代数据的一个"元素"
+
+4.**class DataLoader()**再调用**class _DataLoaderIter()**
+
+5.在**_DataLoaderIter()**类中会跳到__next__(self)函数，在该函数中会通过```indices=next(self.sample_iter)```获取一个batch的indices再通过```batch = self.collate_fn([self.dataset[i] for i in indices])```获取一个batch的数据，在```batch = self.collate_fn([self.dataset[i] for i in indices])```中会调用```self.collate_fn```函数
+
+6.**self.collate_fn**中会调用MyDataset类中的__getitem__()函数，在__getitem__()中通过```Image.open(fn).convert("RGB")```读取图片
+
+7.通过Image.open(fn).convert('RGB')读取图片之后，会对图片进行预处理等一系列transform后，最后返回img,label,再通过self.collate_fn来拼接成一个batch。一个batch是一个list，有两个元素，第一个元素是图片数据、第二个是标签数据。
+
+8.将图片数据加载到模型中
