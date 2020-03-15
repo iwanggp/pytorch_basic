@@ -101,16 +101,14 @@ supporting integer indexing in range from 0 to len(self) exclusive.
 
 这里需要重点看的是getitem函数，getitem接受一个index，然后返回图片数据和标签，这个index通常指的是一个list的index，那么这个list的每个元素就包含了图片数据的路径和标签信息。归纳一下就是如下的3个基本流程：
 
->**1.制作存储了图片的路径和标签信息的txt**
-
->**2.将这些信息转化成list，该list每一个元素对应一个样本**
-
->**3.通过getitem函数，读取数据和标签，并返回数据和标签**
+>1. 制作存储了图片的路径和标签信息的txt
+>2. 将这些信息转化成list，该list每一个元素对应一个样本
+>3. 通过getitem函数，读取数据和标签，并返回数据和标签
 
 实际操作中，我们只要通过DataLoader就可以获取一个batch的数据，其实触发去读取图片操作的是Dataloader里的__iter__(self)，因此这里如果让PyTorch读取自己的数据集，这里归纳一下需要两步：
 
-> **1. 制作图片数据的索引**
-> **2.构建Dataset的子类**
+> 1. 制作图片数据的索引
+> 2. 构建Dataset的子类
 
 ##### 制作图片数据的索引
 
